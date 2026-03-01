@@ -1,0 +1,12 @@
+# Build artifacts
+/build/
+/stage1exe
+*.o
+
+# Generated outputs (keep placeholder only)
+/outputs/*
+!/outputs/.gitkeep
+
+# Crash dumps (project root)
+/core
+/core.*

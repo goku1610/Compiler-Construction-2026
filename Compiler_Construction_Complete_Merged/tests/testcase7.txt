@@ -1,0 +1,95 @@
+_function1
+input parameter list [int c2, int d2cd]
+output parameter list [int b5d, int d3];
+	b5d<---c2+234-d2cd;
+	d3<---b5d+20;
+
+	%testing conditional statement and boolean operation
+	if((d3<=c5cd) @@@ (b4>d2cd234))
+	then
+		c7 <--- 0;
+	else
+		c7 <--- 1;
+	endif
+
+
+	%testing iterative statement
+	while(c2d3 <=d2c3)
+		c2d3 <--- c2d3+1;
+		write (c2d3);
+	endwhile
+
+	return [b5d, d3];
+end
+
+_main
+	% testing record type definition
+	definetype record #definitionone as #definitiontwo
+		record #definitionone
+		type int : z;
+		type #pqr :a; %non-recursive nested using definetype
+		type record #abc: b; %non-recursive nested without using definetype
+		type #definitiontwo : c; %recursive nested using definetype
+	endrecord
+
+	% testing actual union definition
+	union #student
+		type int: rollno;
+		type real:marks;
+		type int: age;
+	endunion
+
+
+	% testing union type definition
+	definetype union #student as #newname
+
+	%testing actual record definition
+	record #taggedunionexample
+		type int: tagvalue;
+		type #newname: field;
+	endrecord
+
+	% testing type declarations
+	type int: b4d333;
+	type int : c3ddd34; type int:c2d3; type int: c2d4;
+
+	% testing global declaration
+
+	type int: c5d2: global;
+
+	% testing record variable declaration
+	type record #taggedunionexample: b7bc34;
+
+	% testing typedefined record declaration
+	type record #definitionone: c2d4;
+	type #definitiontwo: c5;
+	
+	% testing record field declarations
+
+	b7bc34.tagvalue <--- 1;
+	b7bc34. field.rollno <--- 23;
+	write(b7bc34. field.rollno); %No type error
+	write(b7bc34. field.marks); % Compiler reports the type error – dynamic type checking
+	b7bc34.tagvalue <--- 2;
+	b7bc34. field.marks <--- 97.50;
+	b7bc34.tagvalue <--- 3;
+	b7bc34. field.age <--- 21;
+
+
+	% testing read statement
+	read(b4d333); read(c3ddd34);
+
+	%testing function call with parameters
+	[c2d3, c2d4]<--- call _function1 with parameters [b4d333, c3ddd34];
+
+	%testing function call without parameters
+	call _function1 with parameters [b4d333, c3ddd34];
+
+	% testing write statement
+	write(c2d3); write(c2d4);
+
+	%testing assignment operation with arithmetic operators
+	c2ddd2 <--- (4 + 3)*(d3bd -73);
+
+	return;
+end
