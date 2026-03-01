@@ -10,3 +10,6 @@
 # Crash dumps (project root)
 /core
 /core.*
+
+# Batch run temp logs
+/reports/.run_*.log
