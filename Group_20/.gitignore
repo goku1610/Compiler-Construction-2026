@@ -2,6 +2,7 @@
 /build/
 /stage1exe
 *.o
+*.d
 
 # Generated outputs (keep placeholder only)
 /outputs/*

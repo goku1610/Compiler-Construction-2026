@@ -10,10 +10,18 @@ Group Number: 20 | Team Members:
 
 #include "token_model.h"
 
-#define NON_TERMINAL_COUNT 53
-#define MAX_RULE_SIZE 15
+#define PARSER_NON_TERMINAL_COUNT 53
+#define PARSER_MAX_RULE_SIZE 15
 
-typedef enum {
+#ifndef NON_TERMINAL_COUNT
+#define NON_TERMINAL_COUNT PARSER_NON_TERMINAL_COUNT
+#endif
+
+#ifndef MAX_RULE_SIZE
+#define MAX_RULE_SIZE PARSER_MAX_RULE_SIZE
+#endif
+
+typedef enum NonTerminalId {
     NT_PROGRAM,
     NT_MAINFUNCTION,
     NT_OTHERFUNCTIONS,
@@ -69,26 +77,28 @@ typedef enum {
     NT_A,
 } NON_TERMINAL;
 
-typedef struct {
+typedef union GrammarSymbolValue {
+    TOKEN_TYPE t;
+    NON_TERMINAL nt;
+} GrammarSymbolValue;
+
+typedef struct GrammarElement {
     bool terminal;
-    union {
-        TOKEN_TYPE t;
-        NON_TERMINAL nt;
-    } var;
+    GrammarSymbolValue var;
 } grammar_element;
 
-typedef struct {
+typedef struct GrammarRule {
     grammar_element elements[MAX_RULE_SIZE];
     int element_count;
 } grammar_rule;
 
-typedef struct {
+typedef struct GrammarStore {
     grammar_rule rules[NON_TERMINAL_COUNT][MAX_RULE_SIZE];
     int rule_count[NON_TERMINAL_COUNT];
     bool has_epsillon[NON_TERMINAL_COUNT];
 } grammar;
 
-typedef struct {
+typedef struct FirstAndFollowData {
     TOKEN_TYPE first[NON_TERMINAL_COUNT][MAX_RULE_SIZE];
     int first_count[NON_TERMINAL_COUNT];
     bool first_has_epsillon[NON_TERMINAL_COUNT];
@@ -99,11 +109,11 @@ typedef struct {
     int follow_rule[NON_TERMINAL_COUNT];
 } FirstAndFollow;
 
-typedef struct {
+typedef struct ParseTableData {
     int table[NON_TERMINAL_COUNT][TOTAL_TOKENS];
 } table;
 
-typedef struct {
+typedef struct ParseTreeNodeData {
     grammar_element symbol;
     int line;
     char *lexeme;
@@ -114,9 +124,9 @@ typedef struct parseTree parseTree;
 
 struct parseTree {
     parseTreeElement ele;
-    struct parseTree *parent;
+    parseTree *parent;
     int no_of_children;
-    struct parseTree *children[MAX_RULE_SIZE];
+    parseTree *children[MAX_RULE_SIZE];
 };
 
-#endif
+#endif  /* PARSER_DEF_H */

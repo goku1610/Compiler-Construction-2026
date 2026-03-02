@@ -15,6 +15,7 @@ SOURCES = \
 	ascii_text.c
 
 OBJECTS = $(SOURCES:.c=.o)
+DEPS = $(OBJECTS:.o=.d)
 
 .PHONY: all clean run
 
@@ -24,10 +25,12 @@ stage1exe: $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 run: stage1exe
 	./stage1exe
 
 clean:
-	rm -f stage1exe *.o
+	rm -f stage1exe *.o *.d
+
+-include $(DEPS)

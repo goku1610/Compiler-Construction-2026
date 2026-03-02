@@ -70,7 +70,11 @@ parseTree *parseInputSourceCode(char *infile, table T)
 
 }
 
-void createParseTable(FirstAndFollow ff, table T)
+void createParseTable(FirstAndFollow ff, table *T)
 {
-    buildParseTable(ff, &T);
+    if (T == NULL)
+    {
+        return;
+    }
+    buildParseTable(ff, T);
 }
