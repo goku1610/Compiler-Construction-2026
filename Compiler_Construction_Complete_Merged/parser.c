@@ -1,12 +1,19 @@
+/*
+Group Number: 20 | Team Members:
+2022B3A70374P Aditya Thole | 2022B5A71313P Anmol Agrawal
+2022B5A71614P Ansh Nohria | 2022B3A70512P Nirmal Swaroop Raghunandan
+2022B2A70653P Saksham Rohatgi
+*/
 #include "parser.h"
+#include "lexer.h"
 #include "grammar_sets.h"
 #include "parse_runtime.h"
 
 #include <stdio.h>
 
-void printParseTree(parseTree *PT, char *outfile)
+void printParseTree(parseTree PT, char *outfile)
 {
-    if (PT == NULL || outfile == NULL)
+    if (outfile == NULL)
    {
         return;
     }
@@ -18,7 +25,7 @@ void printParseTree(parseTree *PT, char *outfile)
         return;
     }
 
-    printParseTreeInorder(PT, fp);
+    printParseTreeInorder(&PT, fp);
 
     fclose(fp);
 }
@@ -26,13 +33,18 @@ void printParseTree(parseTree *PT, char *outfile)
 void createParseTableStrict(FirstAndFollow ff, table *T)
 
  {
-    createParseTable(ff, T);
+    if (T == NULL)
+    {
+        return;
+    }
+
+    buildParseTable(ff, T);
 
 }
 
 FirstAndFollow ComputeFirstAndFollowSets(grammar G)
 {
-    return computeFirstFollowSet(G);
+    return computeFirstandFollowSets(G);
 }
 
 parseTree *parseInputSourceCode(char *infile, table T)
@@ -58,12 +70,7 @@ parseTree *parseInputSourceCode(char *infile, table T)
 
 }
 
-void createParseTable(FirstAndFollow ff, table *T)
+void createParseTable(FirstAndFollow ff, table T)
 {
-    if (T == NULL)
-    {
-       return;
-    }
-
-    buildParseTable(ff, T);
+    buildParseTable(ff, &T);
 }

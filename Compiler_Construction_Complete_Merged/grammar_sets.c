@@ -1,3 +1,9 @@
+/*
+Group Number: 20 | Team Members:
+2022B3A70374P Aditya Thole | 2022B5A71313P Anmol Agrawal
+2022B5A71614P Ansh Nohria | 2022B3A70512P Nirmal Swaroop Raghunandan
+2022B2A70653P Saksham Rohatgi
+*/
 
 #include "grammar_sets.h"
 #include "token_model.h"
@@ -19,7 +25,7 @@ void followDepAdd(NON_TERMINAL nt, NON_TERMINAL dep, NON_TERMINAL **followDep,
     followDep[nt][(depCount[nt])++] = dep;
 }
 
-void followAdd(FirstFollow *ff, NON_TERMINAL nt, TOKEN_TYPE t)
+void followAdd(FirstAndFollow *ff, NON_TERMINAL nt, TOKEN_TYPE t)
 {
     for (int i = 0; i < ff->follow_count[nt]; i++)
     {
@@ -34,7 +40,7 @@ void followAdd(FirstFollow *ff, NON_TERMINAL nt, TOKEN_TYPE t)
 }
 
 void clearDependency(NON_TERMINAL nt, NON_TERMINAL **followDep, int *depCount,
-                     FirstFollow *ff)
+                     FirstAndFollow *ff)
 {
     if (depCount[nt] == 0)
      {
@@ -56,7 +62,7 @@ void clearDependency(NON_TERMINAL nt, NON_TERMINAL **followDep, int *depCount,
     }
 }
 
-void followHelper(FirstFollow *ff, grammar_rule rule, NON_TERMINAL LHS,
+void followHelper(FirstAndFollow *ff, grammar_rule rule, NON_TERMINAL LHS,
                   NON_TERMINAL **followDep, int *depCount)
 {
     for (int i = 0; i < rule.element_count - 1; i++)
@@ -106,7 +112,7 @@ void followHelper(FirstFollow *ff, grammar_rule rule, NON_TERMINAL LHS,
     }
 }
 
-void firstUnion(FirstFollow *ff, NON_TERMINAL nt1, NON_TERMINAL nt2)
+void firstUnion(FirstAndFollow *ff, NON_TERMINAL nt1, NON_TERMINAL nt2)
 {
    int nxt = ff->first_count[nt1];
 
@@ -132,7 +138,7 @@ void firstUnion(FirstFollow *ff, NON_TERMINAL nt1, NON_TERMINAL nt2)
     ff->first_count[nt1] = nxt;
 }
 
-void computeFirstRec(FirstFollow *ff, NON_TERMINAL nt, grammar G, bool *fr)
+void computeFirstRec(FirstAndFollow *ff, NON_TERMINAL nt, grammar G, bool *fr)
 {
     if (fr[nt])
     {

@@ -1,6 +1,12 @@
-#include "lexer.h"
+/*
+Group Number: 20 | Team Members:
+2022B3A70374P Aditya Thole | 2022B5A71313P Anmol Agrawal
+2022B5A71614P Ansh Nohria | 2022B3A70512P Nirmal Swaroop Raghunandan
+2022B2A70653P Saksham Rohatgi
+*/
+#include "lexerDef.h"
 #include "ascii_text.h"
-#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 
   trie createTrieNode()
@@ -1117,6 +1123,8 @@ populate_buffer(B, fp);
 B->index = 0;
 populate_buffer(B, fp);
 initializeLookupTable();
+printf("%-12s%-30s%-20s\n", "LineNo", "Lexeme", "Token");
+printf("%-12s%-30s%-20s\n", "------", "------", "-----");
    while (B->buffer[B->index] != '\0')
 
   {
@@ -1136,8 +1144,8 @@ token->type != EXIT_TOKEN && token->type != BLANK)
  {
 
     if (handle_valid_error(token))
-  printf("Line no. %d\t Lexeme %s\t Token %s\n", token->line,
-   token->lexeme, getTokenName(token->type));
+  printf("%-12d%-30s%-20s\n", token->line, token->lexeme,
+   getTokenName(token->type));
   }
 if (token->type == TK_COMMENT)
 

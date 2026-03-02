@@ -1,4 +1,11 @@
+/*
+Group Number: 20 | Team Members:
+2022B3A70374P Aditya Thole | 2022B5A71313P Anmol Agrawal
+2022B5A71614P Ansh Nohria | 2022B3A70512P Nirmal Swaroop Raghunandan
+2022B2A70653P Saksham Rohatgi
+*/
 
+#include "parse_runtime.h"
 #include "lexer.h"
 #include "token_model.h"
 #include "grammar_model.h"
@@ -198,7 +205,7 @@ fputs("digraph ParseTree {\n", fp);
      fputs("}\n", fp);
   }
 
-   void buildParseTable(FirstFollow ff, table *T)
+   void buildParseTable(FirstAndFollow ff, table *T)
 
 {
     for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
@@ -252,10 +259,10 @@ followIndex++)
 
 }
 
-FirstFollow computeFirstFollowSet(grammar G)
+FirstAndFollow computeFirstandFollowSets(grammar G)
 
  {
-FirstFollow ff;
+FirstAndFollow ff;
 
     bool fr[NON_TERMINAL_COUNT];
      NON_TERMINAL **fdep =
@@ -318,7 +325,7 @@ free(fdep[ntIndex]);
 }
 
 
-   parseTree *parseInputSourceCodeStream(table T, FirstFollow ff, grammar G, FILE *fp)
+   parseTree *parseInputSourceCodeStream(table T, FirstAndFollow ff, grammar G, FILE *fp)
 
 {
 (void)ff;
@@ -582,5 +589,3 @@ while (sTop >= 0)
 
   return PT;
    }
-
-
