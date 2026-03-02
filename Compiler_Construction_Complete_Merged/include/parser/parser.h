@@ -4,7 +4,7 @@
 #include "parser/parserDef.h"
 
 FirstAndFollow ComputeFirstAndFollowSets(grammar G);
-void createParseTable(FirstAndFollow F, table T);
+void createParseTable(FirstAndFollow F, table *T);
 void createParseTableStrict(FirstAndFollow F, table *T);
 
 parseTree *parseInputSourceCode(char *testcaseFile, table T);

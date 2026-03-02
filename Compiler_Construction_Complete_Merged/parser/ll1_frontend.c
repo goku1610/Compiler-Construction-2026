@@ -335,7 +335,7 @@ static void printLineEntry(parseTree *PT, FILE *outfile) {
     fprintf(outfile, "%-30s", lineText);
   }
   fprintf(outfile, "%-30s%-30s%-30s%-30s%-30s\n", tokenName, valueIfNumber,
-          parentSymbol, isLeaf ? "YES" : "NO", nodeSymbol);
+          parentSymbol, isLeaf ? "yes" : "no", nodeSymbol);
 }
 
 static void printParseTreeInorderRec(parseTree *PT, FILE *outfile) {
@@ -361,7 +361,7 @@ void printParseTreeInorder(parseTree *PT, FILE *outfile) {
   }
 
   fprintf(outfile, "%-30s%-30s%-30s%-30s%-30s%-30s%-30s\n\n",
-          "lexemeCurrentNode", "lineno", "tokenName", "valueIfNumber",
+          "lexeme CurrentNode", "lineno", "tokenName", "valueIfNumber",
           "parentNodeSymbol", "isLeafNode(yes/no)", "NodeSymbol");
   printParseTreeInorderRec(PT, outfile);
 }

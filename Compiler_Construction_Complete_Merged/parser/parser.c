@@ -8,15 +8,15 @@ FirstAndFollow ComputeFirstAndFollowSets(grammar G) {
   return computeFirstFollowSet(G);
 }
 
-void createParseTable(FirstAndFollow F, table T) {
-  buildParseTable(F, &T);
-}
-
-void createParseTableStrict(FirstAndFollow F, table *T) {
+void createParseTable(FirstAndFollow F, table *T) {
   if (T == NULL) {
     return;
   }
   buildParseTable(F, T);
+}
+
+void createParseTableStrict(FirstAndFollow F, table *T) {
+  createParseTable(F, T);
 }
 
 parseTree *parseInputSourceCode(char *testcaseFile, table T) {
