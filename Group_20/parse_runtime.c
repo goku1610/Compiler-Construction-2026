@@ -6,586 +6,604 @@ Group Number: 20 | Team Members:
 */
 
 #include "parse_runtime.h"
-#include "lexer.h"
-#include "token_model.h"
+
 #include "grammar_model.h"
 #include "grammar_sets.h"
-#include <stdio.h>
+#include "lexer.h"
+#include "token_model.h"
+
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+typedef struct {
+    parseTree *node;
+    grammar_element symbol;
+} ParseFrame;
 
+typedef struct {
+    parseTree *node;
+    int stage;
+    int next_child;
+} InorderFrame;
 
-static void printLineEntry(parseTree *PT, FILE *fp)
-   {
-const int isLf = (PT->no_of_children == 0);
-  const int isTerm = PT->ele.symbol.terminal;
-const char *lexeme = (isLf && PT->ele.lexeme != NULL) ? PT->ele.lexeme : "----";
-    const char *lineText = (isLf && PT->ele.line >= 0) ? NULL : "----";
-const char *tok = isTerm ? getTokenName(PT->ele.symbol.var.t) : "----";
- const char *val =
- (isTerm &&
-  (PT->ele.symbol.var.t == TK_NUM || PT->ele.symbol.var.t == TK_RNUM) &&
-     PT->ele.lexeme != NULL)
-? PT->ele.lexeme
-    : "----";
+typedef struct {
+    parseTree *node;
+} NodeFrame;
 
-const char *psym = "ROOT";
-if (PT->parent != NULL)
-
+static parseTree *new_parse_node(parseTree *parent)
 {
-   psym = getNonTerminal(PT->parent->ele.symbol.var.nt);
-      }
-
-
-   const char *nsym = isTerm ? getTokenName(PT->ele.symbol.var.t)
-: getNonTerminal(PT->ele.symbol.var.nt);
-
-fprintf(fp, "%-30s", lexeme);
-  if (lineText == NULL)
-
-{
-  fprintf(fp, "%-30d", PT->ele.line);
-}
-else
-{
- fprintf(fp, "%-30s", lineText);
-}
-  fprintf(fp, "%-30s%-30s%-30s%-30s%-30s\n", tok, val, psym, isLf ? "yes" : "no",
- nsym);
- }
-
-static void printParseTreeInorderRec(parseTree *PT, FILE *fp)
-
-{
-     if (PT == NULL)
-
- {
-   return;
-
-  }
-if (PT->no_of_children != 0 && PT->children[0] != NULL)
-
-
-  {
-   printParseTreeInorderRec(PT->children[0], fp);
- }
-if (fp != NULL)
-{
-printLineEntry(PT, fp);
-     for (int childIndex = 1; childIndex < PT->no_of_children; childIndex++)
-   {
-     if (PT->children[childIndex] != NULL)
-
-
-  {
-     printParseTreeInorderRec(PT->children[childIndex], fp);
-
- }
-
-}
-}
-}
-
- void printParseTreeInorder(parseTree *PT, FILE *fp)
-
- {
-  if (PT == NULL || fp == NULL)
-
-   {
-    return;
-
-}
-
- fprintf(fp, "%-30s%-30s%-30s%-30s%-30s%-30s%-30s\n\n", "lexeme CurrentNode",
-"lineno", "tokenName", "valueIfNumber", "parentNodeSymbol",
-"isLeafNode(yes/no)", "NodeSymbol");
-  printParseTreeInorderRec(PT, fp);
-
-}
-
-
- static void writeEscapedDotText(FILE *fp, const char *text)
-
-{
-if (text == NULL)
+    parseTree *node = (parseTree *)malloc(sizeof(parseTree));
+    if (node == NULL)
     {
-    return;
-   }
-
-
-for (const char *p = text; *p != '\0'; p++)
- {
-   if (*p == '"' || *p == '\\')
-{
-   fputc('\\', fp);
- }
-   if (*p == '\n' || *p == '\r')
- {
-fputs("\\n", fp);
-    continue;
-}
-
-fputc(*p, fp);
-
-    }
-   }
-
-
-
-static void writeDotNodeRecursive(parseTree *node, FILE *fp)
-
-  {
-  if (node == NULL)
-{
-   return;
-   }
-
-
-   const char *symbol = NULL;
-  if (node->ele.symbol.terminal)
-{
-   symbol = getTokenName(node->ele.symbol.var.t);
-
-}
-
-  else
-{
-symbol = getNonTerminal(node->ele.symbol.var.nt);
-
-}
-
-
-
-  unsigned long long nodeId = (unsigned long long)(uintptr_t)node;
-   fprintf(fp, "  n%llx [label=\"", nodeId);
-writeEscapedDotText(fp, symbol);
-
-if (node->ele.symbol.terminal && node->ele.lexeme != NULL)
-{
-     fputs("\\nlexeme: ", fp);
-  writeEscapedDotText(fp, node->ele.lexeme);
-}
-if (node->ele.line >= 0)
-
-  {
-    fprintf(fp, "\\nline: %d", node->ele.line);
-}
-fprintf(fp, "\"];\n");
-
-  for (int i = 0; i < node->no_of_children; i++)
-
-{
- parseTree *child = node->children[i];
- if (child == NULL)
-   {
-      continue;
-   }
-
-unsigned long long childId = (unsigned long long)(uintptr_t)child;
-   fprintf(fp, "  n%llx -> n%llx;\n", nodeId, childId);
-  writeDotNodeRecursive(child, fp);
-}
- }
-
- void writeParseTreeDot(parseTree *PT, FILE *fp)
-{
-   if (PT == NULL || fp == NULL)
-  {
-  return;
-
+        return NULL;
     }
 
+    node->ele.symbol.terminal = false;
+    node->ele.symbol.var.nt = NT_PROGRAM;
+    node->ele.line = -1;
+    node->ele.lexeme = NULL;
+    node->ele.lexemeSize = 0;
+    node->parent = parent;
+    node->no_of_children = 0;
 
-fputs("digraph ParseTree {\n", fp);
-
- fputs("  rankdir=TB;\n", fp);
-   fputs("  node [shape=box, style=rounded, fontsize=10];\n", fp);
-  writeDotNodeRecursive(PT, fp);
-     fputs("}\n", fp);
-  }
-
-   void buildParseTable(FirstAndFollow ff, table *T)
-
-{
-    for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
-{
-      for (int tokenIndex = 0; tokenIndex < TOTAL_TOKENS; tokenIndex++)
-   {
-    T->table[ntIndex][tokenIndex] = -1;
-     }
-
-   }
-
-
-  for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
- {
- for (int firstIndex = 0; firstIndex < ff.first_count[ntIndex]; firstIndex++)
-  {
-
-  T->table[ntIndex][ff.first[ntIndex][firstIndex]] =
-   ff.rule_no[ntIndex][firstIndex];
-
+    for (int idx = 0; idx < MAX_RULE_SIZE; ++idx)
+    {
+        node->children[idx] = NULL;
     }
 
-if (ff.follow_rule[ntIndex] != -1)
-  {
-  for (int followIndex = 0; followIndex < ff.follow_count[ntIndex];
-     followIndex++)
-  {
- T->table[ntIndex][ff.follow[ntIndex][followIndex]] =
-  ff.follow_rule[ntIndex];
- }
+    return node;
 }
 
- else
+static void print_line_entry(const parseTree *node, FILE *fp)
+{
+    const bool is_leaf = (node->no_of_children == 0);
+    const bool is_terminal = node->ele.symbol.terminal;
 
-   {
-for (int followIndex = 0; followIndex < ff.follow_count[ntIndex];
-followIndex++)
-  {
-    if (T->table[ntIndex][ff.follow[ntIndex][followIndex]] == -1)
+    const char *lexeme_text = (is_leaf && node->ele.lexeme != NULL) ? node->ele.lexeme : "----";
+    const char *token_name = is_terminal ? getTokenName(node->ele.symbol.var.t) : "----";
 
-       {
-       T->table[ntIndex][ff.follow[ntIndex][followIndex]] = -2;
-  }
+    const bool is_number_terminal =
+        is_terminal &&
+        (node->ele.symbol.var.t == TK_NUM || node->ele.symbol.var.t == TK_RNUM) &&
+        node->ele.lexeme != NULL;
+    const char *numeric_value = is_number_terminal ? node->ele.lexeme : "----";
 
+    const char *parent_name = "ROOT";
+    if (node->parent != NULL)
+    {
+        parent_name = getNonTerminal(node->parent->ele.symbol.var.nt);
+    }
+
+    const char *node_symbol =
+        is_terminal ? getTokenName(node->ele.symbol.var.t) : getNonTerminal(node->ele.symbol.var.nt);
+
+    fprintf(fp, "%-30s", lexeme_text);
+    if (is_leaf && node->ele.line >= 0)
+    {
+        fprintf(fp, "%-30d", node->ele.line);
+    }
+    else
+    {
+        fprintf(fp, "%-30s", "----");
+    }
+
+    fprintf(fp,
+            "%-30s%-30s%-30s%-30s%-30s\n",
+            token_name,
+            numeric_value,
+            parent_name,
+            is_leaf ? "yes" : "no",
+            node_symbol);
 }
 
-  }
+void printParseTreeInorder(parseTree *PT, FILE *fp)
+{
+    if (PT == NULL || fp == NULL)
+    {
+        return;
+    }
 
+    fprintf(fp,
+            "%-30s%-30s%-30s%-30s%-30s%-30s%-30s\n\n",
+            "lexeme CurrentNode",
+            "lineno",
+            "tokenName",
+            "valueIfNumber",
+            "parentNodeSymbol",
+            "isLeafNode(yes/no)",
+            "NodeSymbol");
 
+    InorderFrame frames[4096];
+    int top = 0;
+    frames[top].node = PT;
+    frames[top].stage = 0;
+    frames[top].next_child = 1;
+
+    while (top >= 0)
+    {
+        InorderFrame *frame = &frames[top];
+        parseTree *node = frame->node;
+
+        if (node == NULL)
+        {
+            --top;
+            continue;
+        }
+
+        if (frame->stage == 0)
+        {
+            frame->stage = 1;
+            if (node->no_of_children > 0 && node->children[0] != NULL)
+            {
+                ++top;
+                frames[top].node = node->children[0];
+                frames[top].stage = 0;
+                frames[top].next_child = 1;
+                continue;
+            }
+        }
+
+        if (frame->stage == 1)
+        {
+            print_line_entry(node, fp);
+            frame->stage = 2;
+            frame->next_child = 1;
+        }
+
+        if (frame->stage == 2)
+        {
+            int child_index = frame->next_child;
+            while (child_index < node->no_of_children && node->children[child_index] == NULL)
+            {
+                ++child_index;
+            }
+
+            if (child_index < node->no_of_children)
+            {
+                frame->next_child = child_index + 1;
+                ++top;
+                frames[top].node = node->children[child_index];
+                frames[top].stage = 0;
+                frames[top].next_child = 1;
+                continue;
+            }
+        }
+
+        --top;
+    }
 }
 
+static void emit_dot_text(FILE *fp, const char *text)
+{
+    if (fp == NULL || text == NULL)
+    {
+        return;
+    }
+
+    for (const char *cursor = text; *cursor != '\0'; ++cursor)
+    {
+        if (*cursor == '"' || *cursor == '\\')
+        {
+            fputc('\\', fp);
+        }
+
+        if (*cursor == '\n' || *cursor == '\r')
+        {
+            fputs("\\n", fp);
+            continue;
+        }
+
+        fputc(*cursor, fp);
+    }
+}
+
+void writeParseTreeDot(parseTree *PT, FILE *fp)
+{
+    if (PT == NULL || fp == NULL)
+    {
+        return;
+    }
+
+    fputs("digraph ParseTree {\n", fp);
+    fputs("  rankdir=TB;\n", fp);
+    fputs("  node [shape=box, style=rounded, fontsize=10];\n", fp);
+
+    NodeFrame stack[4096];
+    int top = 0;
+    stack[top].node = PT;
+
+    while (top >= 0)
+    {
+        parseTree *node = stack[top--].node;
+        if (node == NULL)
+        {
+            continue;
+        }
+
+        const char *symbol = node->ele.symbol.terminal
+                                 ? getTokenName(node->ele.symbol.var.t)
+                                 : getNonTerminal(node->ele.symbol.var.nt);
+
+        unsigned long long node_id = (unsigned long long)(uintptr_t)node;
+        fprintf(fp, "  n%llx [label=\"", node_id);
+        emit_dot_text(fp, symbol);
+
+        if (node->ele.symbol.terminal && node->ele.lexeme != NULL)
+        {
+            fputs("\\nlexeme: ", fp);
+            emit_dot_text(fp, node->ele.lexeme);
+        }
+        if (node->ele.line >= 0)
+        {
+            fprintf(fp, "\\nline: %d", node->ele.line);
+        }
+        fputs("\"];\n", fp);
+
+        for (int idx = node->no_of_children - 1; idx >= 0; --idx)
+        {
+            parseTree *child = node->children[idx];
+            if (child == NULL)
+            {
+                continue;
+            }
+
+            unsigned long long child_id = (unsigned long long)(uintptr_t)child;
+            fprintf(fp, "  n%llx -> n%llx;\n", node_id, child_id);
+
+            ++top;
+            stack[top].node = child;
+        }
+    }
+
+    fputs("}\n", fp);
+}
+
+void buildParseTable(FirstAndFollow ff, table *T)
+{
+    if (T == NULL)
+    {
+        return;
+    }
+
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
+    {
+        for (int tk = 0; tk < TOTAL_TOKENS; ++tk)
+        {
+            T->table[nt][tk] = -1;
+        }
+    }
+
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
+    {
+        for (int idx = 0; idx < ff.first_count[nt]; ++idx)
+        {
+            TOKEN_TYPE lookahead = ff.first[nt][idx];
+            T->table[nt][lookahead] = ff.rule_no[nt][idx];
+        }
+
+        if (ff.follow_rule[nt] != -1)
+        {
+            for (int idx = 0; idx < ff.follow_count[nt]; ++idx)
+            {
+                TOKEN_TYPE lookahead = ff.follow[nt][idx];
+                T->table[nt][lookahead] = ff.follow_rule[nt];
+            }
+            continue;
+        }
+
+        for (int idx = 0; idx < ff.follow_count[nt]; ++idx)
+        {
+            TOKEN_TYPE lookahead = ff.follow[nt][idx];
+            if (T->table[nt][lookahead] == -1)
+            {
+                T->table[nt][lookahead] = -2;
+            }
+        }
+    }
 }
 
 FirstAndFollow computeFirstandFollowSets(grammar G)
-
- {
-FirstAndFollow ff;
-
-    bool fr[NON_TERMINAL_COUNT];
-     NON_TERMINAL **fdep =
-     (NON_TERMINAL **)malloc(sizeof(NON_TERMINAL *) * NON_TERMINAL_COUNT);
-    int depCount[NON_TERMINAL_COUNT];
-
-for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
-
-   {
-   ff.first_count[ntIndex] = 0;
-       ff.follow_count[ntIndex] = 0;
-  ff.first_has_epsillon[ntIndex] = false;
-    ff.follow_rule[ntIndex] = -1;
-  fr[ntIndex] = false;
-    depCount[ntIndex] = 0;
-    fdep[ntIndex] = (NON_TERMINAL *)calloc(MAX_RULE_SIZE, sizeof(NON_TERMINAL));
-  }
-
-
-for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
- {
-  computeFirstRec(&ff, (NON_TERMINAL)ntIndex, G, fr);
-
- }
-
-
-
-ff.follow[NT_PROGRAM][0] = DOLLAR;
-  ff.follow_count[NT_PROGRAM] = 1;
-
-
-   for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
 {
-   for (int ruleIndex = 0; ruleIndex < G.rule_count[ntIndex]; ruleIndex++)
-     {
-       followHelper(&ff, G.rules[ntIndex][ruleIndex], (NON_TERMINAL)ntIndex,
-     fdep, depCount);
-}
-  }
+    FirstAndFollow ff;
+    memset(&ff, 0, sizeof(ff));
 
+    bool first_ready[NON_TERMINAL_COUNT];
+    int dep_count[NON_TERMINAL_COUNT];
+    NON_TERMINAL **dependencies =
+        (NON_TERMINAL **)malloc(sizeof(NON_TERMINAL *) * NON_TERMINAL_COUNT);
 
- for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
- {
-   if (depCount[ntIndex] > 0)
-{
-  clearDependency(ntIndex, fdep, depCount, &ff);
-
-    }
-   }
-
-
-  for (int ntIndex = 0; ntIndex < NON_TERMINAL_COUNT; ntIndex++)
-{
-free(fdep[ntIndex]);
-
-   }
-   free(fdep);
-
- return ff;
-}
-
-
-   parseTree *parseInputSourceCodeStream(table T, FirstAndFollow ff, grammar G, FILE *fp)
-
-{
-(void)ff;
-
-    grammar_element *stack[200];
-    parseTree *treeStack[200];
-
-     twinBuffer B = (twinBuffer)malloc(sizeof(TWIN_BUFFER));
-     for (int idx = 0; idx < 2 * BUFFER_SIZE; idx++)
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
     {
-   B->buffer[idx] = '\0';
+        ff.first_count[nt] = 0;
+        ff.follow_count[nt] = 0;
+        ff.first_has_epsillon[nt] = false;
+        ff.follow_rule[nt] = -1;
 
+        first_ready[nt] = false;
+        dep_count[nt] = 0;
+
+        dependencies[nt] = (NON_TERMINAL *)calloc(MAX_RULE_SIZE, sizeof(NON_TERMINAL));
     }
-B->index = 2 * BUFFER_SIZE - 1;
-B->line = 1;
-  populate_buffer(B, fp);
- B->index = 0;
- populate_buffer(B, fp);
 
-  initializeLookupTable();
-
-
-int sTop = 0;
-  int tTop = 0;
-int oldLine = -1;
-   bool err = false;
-
-   parseTree *PT = malloc(sizeof(parseTree));
-   PT->ele.symbol.terminal = false;
-  PT->ele.symbol.var.nt = NT_PROGRAM;
-PT->ele.line = -1;
-   PT->parent = NULL;
-
-
-   treeStack[tTop] = PT;
-
-  grammar_element *dollar = (grammar_element *)malloc(sizeof(grammar_element));
-dollar->terminal = true;
-  dollar->var.t = DOLLAR;
- grammar_element *program = (grammar_element *)malloc(sizeof(grammar_element));
- program->terminal = false;
-program->var.nt = NT_PROGRAM;
-
-stack[sTop] = dollar;
-sTop++;
-  stack[sTop] = program;
-
-   tokenInfo a = nextToken(B, fp);
-while (B->buffer[B->index] != '\0' && sTop >= 0)
-{
-grammar_element *X = stack[sTop];
-
-    if (X->terminal)
-{
-  if (X->var.t == DOLLAR && a->type == DOLLAR)
-       {
-   break;
-      }
-
- else if (X->var.t == a->type)
-{
- parseTree *node = treeStack[tTop];
-     node->ele.symbol.terminal = true;
-    node->ele.symbol.var.t = a->type;
-       node->ele.line = a->line;
-  node->ele.lexeme = a->lexeme;
-       node->ele.lexemeSize = a->lexemeSize;
-
-  free(X);
-  stack[sTop] = NULL;
-
-     sTop--;
-  tTop--;
-       free(a);
-  a = nextToken(B, fp);
- }
-else
- {
-err = true;
-    if (oldLine == a->line)
-   {
-      free(a);
-
-      a = nextToken(B, fp);
-       continue;
-     }
-
-oldLine = a->line;
-printf("Line %02d: Syntax Error : The token %s for lexeme %s does "
- "not "
- "match with the expected token %s\n",
-a->line, getTokenName(a->type), a->lexeme,
-getTokenName(X->var.t));
-free(X);
- stack[sTop] = NULL;
- sTop--;
-tTop--;
-
- }
- }
-else
- {
-
-     NON_TERMINAL nt = X->var.nt;
-  int rule_no = T.table[nt][a->type];
-
-   if (rule_no == -1)
-{
-    err = true;
-  if (oldLine == a->line)
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
     {
-       free(a);
-    a = nextToken(B, fp);
-     continue;
-
-   }
-
-
-
-   oldLine = a->line;
- printf("Line %02d: Syntax Error : Invalid token %s encountered "
-    "with "
-"value %s stack top %s\n",
-     a->line, getTokenName(a->type), a->lexeme,
-getNonTerminal(nt));
-     free(a);
-a = nextToken(B, fp);
-  }
-   else if (rule_no == -2)
-{
-     err = true;
-if (oldLine == a->line)
-    {
-   free(a);
-      a = nextToken(B, fp);
-  continue;
-  }
-
-
-  oldLine = a->line;
-printf("Line %02d: Syntax Error : Invalid token %s encountered "
-"with "
-"value %s stack top %s\n",
-a->line, getTokenName(a->type), a->lexeme,
-getNonTerminal(nt));
- free(X);
-   stack[sTop] = NULL;
- sTop--;
-   tTop--;
-}
- else
- {
-grammar_rule rule = G.rules[nt][rule_no];
-     parseTree *node = treeStack[tTop];
-     tTop--;
- free(X);
-     stack[sTop] = NULL;
-    sTop--;
-
-
-   if (G.has_epsillon[nt] && rule_no == G.rule_count[nt])
-     {
-      node->no_of_children = 1;
-       parseTree *ch = (parseTree *)malloc(sizeof(parseTree));
-   ch->ele.symbol.terminal = true;
-    ch->ele.symbol.var.t = EPSILLON;
- ch->ele.line = -1;
- ch->parent = node;
-      ch->no_of_children = 0;
-  node->children[0] = ch;
-
-}
-  else
-
-  {
-   node->no_of_children = rule.element_count;
-
-for (int idx = rule.element_count - 1; idx >= 0; idx--)
-     {
- parseTree *ch = (parseTree *)malloc(sizeof(parseTree));
- ch->ele.symbol.terminal = rule.elements[idx].terminal;
-        ch->ele.line = -1;
-
- if (rule.elements[idx].terminal)
-       {
-   ch->ele.symbol.var.t = rule.elements[idx].var.t;
+        computeFirstRec(&ff, (NON_TERMINAL)nt, G, first_ready);
     }
-  else
+
+    ff.follow[NT_PROGRAM][0] = DOLLAR;
+    ff.follow_count[NT_PROGRAM] = 1;
+
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
+    {
+        for (int rule = 0; rule < G.rule_count[nt]; ++rule)
+        {
+            followHelper(&ff, G.rules[nt][rule], (NON_TERMINAL)nt, dependencies, dep_count);
+        }
+    }
+
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
+    {
+        if (dep_count[nt] > 0)
+        {
+            clearDependency((NON_TERMINAL)nt, dependencies, dep_count, &ff);
+        }
+    }
+
+    for (int nt = 0; nt < NON_TERMINAL_COUNT; ++nt)
+    {
+        free(dependencies[nt]);
+    }
+    free(dependencies);
+
+    return ff;
+}
+
+static twinBuffer initialize_twin_buffer(FILE *fp)
 {
-      ch->ele.symbol.var.nt = rule.elements[idx].var.nt;
+    twinBuffer buffer = (twinBuffer)malloc(sizeof(TWIN_BUFFER));
+    if (buffer == NULL)
+    {
+        return NULL;
+    }
+
+    for (int idx = 0; idx < 2 * BUFFER_SIZE; ++idx)
+    {
+        buffer->buffer[idx] = '\0';
+    }
+
+    buffer->index = 2 * BUFFER_SIZE - 1;
+    buffer->line = 1;
+
+    populate_buffer(buffer, fp);
+    buffer->index = 0;
+    populate_buffer(buffer, fp);
+
+    return buffer;
 }
 
-ch->parent = node;
- ch->no_of_children = 0;
-  node->children[idx] = ch;
-
-   treeStack[++tTop] = ch;
-   grammar_element *ele =
-  (grammar_element *)malloc(sizeof(grammar_element));
-  ele->terminal = rule.elements[idx].terminal;
-   if (ele->terminal)
+static void push_frame(ParseFrame *stack, int *top, parseTree *node, grammar_element symbol)
 {
-    ele->var.t = rule.elements[idx].var.t;
-
+    ++(*top);
+    stack[*top].node = node;
+    stack[*top].symbol = symbol;
 }
-else
 
-
+static parseTree *append_child(parseTree *parent, int slot, grammar_element symbol)
 {
-     ele->var.nt = rule.elements[idx].var.nt;
+    parseTree *child = new_parse_node(parent);
+    if (child == NULL)
+    {
+        return NULL;
+    }
 
+    child->ele.symbol.terminal = symbol.terminal;
+    if (symbol.terminal)
+    {
+        child->ele.symbol.var.t = symbol.var.t;
+    }
+    else
+    {
+        child->ele.symbol.var.nt = symbol.var.nt;
+    }
+
+    parent->children[slot] = child;
+    return child;
 }
 
-    stack[++sTop] = ele;
-  }
-   }
-
-}
-
-}
-}
-
-if (!(sTop == 0 && stack[sTop]->var.t == DOLLAR))
+static void expand_non_terminal(parseTree *node,
+                                NON_TERMINAL nt,
+                                int rule_no,
+                                grammar G,
+                                ParseFrame *stack,
+                                int *top)
 {
-err = true;
-   printf("Syntax Error : Tokens parsed but stack not empty\n");
+    if (G.has_epsillon[nt] && rule_no == G.rule_count[nt])
+    {
+        node->no_of_children = 1;
 
+        grammar_element eps;
+        eps.terminal = true;
+        eps.var.t = EPSILLON;
+
+        (void)append_child(node, 0, eps);
+        return;
+    }
+
+    grammar_rule rule = G.rules[nt][rule_no];
+    node->no_of_children = rule.element_count;
+
+    parseTree *created[MAX_RULE_SIZE];
+    for (int idx = 0; idx < rule.element_count; ++idx)
+    {
+        created[idx] = append_child(node, idx, rule.elements[idx]);
+    }
+
+    for (int idx = rule.element_count - 1; idx >= 0; --idx)
+    {
+        push_frame(stack, top, created[idx], rule.elements[idx]);
+    }
 }
- else if (a->type != DOLLAR)
 
+static void report_terminal_mismatch(tokenInfo token, TOKEN_TYPE expected)
 {
-  err = true;
- printf("Syntax Error : Stack empty but tokens not parsed\n");
+    printf("Line %02d: Syntax Error : The token %s for lexeme %s does not match with the expected token %s\n",
+           token->line,
+           getTokenName(token->type),
+           token->lexeme,
+           getTokenName(expected));
 }
 
-
-free(B);
-
-if (!err)
-  {
-   printf("Input source code is syntactically correct...........\n");
-   }
-else
+static void report_invalid_token(tokenInfo token, NON_TERMINAL nt)
 {
-    printf("COMPILATION FAILED\n");
+    printf("Line %02d: Syntax Error : Invalid token %s encountered with value %s stack top %s\n",
+           token->line,
+           getTokenName(token->type),
+           token->lexeme,
+           getNonTerminal(nt));
 }
 
-
-while (sTop >= 0)
-
+parseTree *parseInputSourceCodeStream(table T, FirstAndFollow ff, grammar G, FILE *fp)
 {
-   if (stack[sTop] != NULL)
-  {
-     free(stack[sTop]);
+    (void)ff;
 
+    twinBuffer B = initialize_twin_buffer(fp);
+    initializeLookupTable();
+
+    ParseFrame parse_stack[1024];
+    int top = -1;
+
+    parseTree *PT = new_parse_node(NULL);
+    if (PT == NULL)
+    {
+        free(B);
+        return NULL;
+    }
+
+    PT->ele.symbol.terminal = false;
+    PT->ele.symbol.var.nt = NT_PROGRAM;
+
+    grammar_element dollar;
+    dollar.terminal = true;
+    dollar.var.t = DOLLAR;
+
+    grammar_element start;
+    start.terminal = false;
+    start.var.nt = NT_PROGRAM;
+
+    push_frame(parse_stack, &top, NULL, dollar);
+    push_frame(parse_stack, &top, PT, start);
+
+    tokenInfo lookahead = nextToken(B, fp);
+
+    bool err = false;
+    int old_line = -1;
+
+    while (B->buffer[B->index] != '\0' && top >= 0)
+    {
+        ParseFrame current = parse_stack[top];
+
+        if (current.symbol.terminal)
+        {
+            if (current.symbol.var.t == DOLLAR && lookahead->type == DOLLAR)
+            {
+                break;
+            }
+
+            if (current.symbol.var.t == lookahead->type)
+            {
+                if (current.node != NULL)
+                {
+                    current.node->ele.symbol.terminal = true;
+                    current.node->ele.symbol.var.t = lookahead->type;
+                    current.node->ele.line = lookahead->line;
+                    current.node->ele.lexeme = lookahead->lexeme;
+                    current.node->ele.lexemeSize = lookahead->lexemeSize;
+                }
+
+                --top;
+                free(lookahead);
+                lookahead = nextToken(B, fp);
+                continue;
+            }
+
+            err = true;
+            if (old_line == lookahead->line)
+            {
+                free(lookahead);
+                lookahead = nextToken(B, fp);
+                continue;
+            }
+
+            old_line = lookahead->line;
+            report_terminal_mismatch(lookahead, current.symbol.var.t);
+            --top;
+            continue;
+        }
+
+        NON_TERMINAL nt = current.symbol.var.nt;
+        int rule_no = T.table[nt][lookahead->type];
+
+        if (rule_no == -1)
+        {
+            err = true;
+            if (old_line == lookahead->line)
+            {
+                free(lookahead);
+                lookahead = nextToken(B, fp);
+                continue;
+            }
+
+            old_line = lookahead->line;
+            report_invalid_token(lookahead, nt);
+            free(lookahead);
+            lookahead = nextToken(B, fp);
+            continue;
+        }
+
+        if (rule_no == -2)
+        {
+            err = true;
+            if (old_line == lookahead->line)
+            {
+                free(lookahead);
+                lookahead = nextToken(B, fp);
+                continue;
+            }
+
+            old_line = lookahead->line;
+            report_invalid_token(lookahead, nt);
+            --top;
+            continue;
+        }
+
+        --top;
+        expand_non_terminal(current.node, nt, rule_no, G, parse_stack, &top);
+    }
+
+    if (!(top == 0 && parse_stack[top].symbol.terminal && parse_stack[top].symbol.var.t == DOLLAR))
+    {
+        err = true;
+        printf("Syntax Error : Tokens parsed but stack not empty\n");
+    }
+    else if (lookahead->type != DOLLAR)
+    {
+        err = true;
+        printf("Syntax Error : Stack empty but tokens not parsed\n");
+    }
+
+    free(B);
+
+    if (!err)
+    {
+        printf("Input source code is syntactically correct...........\n");
+    }
+    else
+    {
+        printf("COMPILATION FAILED\n");
+    }
+
+    return PT;
 }
-
- sTop--;
-}
-
-
-  return PT;
-   }

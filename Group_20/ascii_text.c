@@ -6,23 +6,28 @@ Group Number: 20 | Team Members:
 */
 
 #include "ascii_text.h"
+#include <stddef.h>
 
 int stringcmp(char *a, char *b)
 {
-     int i = 0;
-  while (a[i] != '\0' && b[i] != '\0')
-
-{
-      if (a[i] != b[i])
+    if (a == b)
+    {
+        return 1;
+    }
+    if (a == NULL || b == NULL)
     {
         return 0;
     }
-      i++;
- }
-if (a[i] == '\0' && b[i] == '\0')
-{
-  return 1;
-}
-return 0;
 
+    while (*a != '\0' && *b != '\0')
+    {
+        if (*a != *b)
+        {
+            return 0;
+        }
+        ++a;
+        ++b;
+    }
+
+    return (*a == '\0' && *b == '\0') ? 1 : 0;
 }
